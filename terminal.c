@@ -1,7 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
+#include "terminal.h"
 
 
 
@@ -57,15 +54,16 @@ void RodaTerminal(){
             }
 
             else{
-                printf("\ncomandos agrupados:\n");
-                for(int k = 0;k < i;k++){
-                    printf("comando %d:\n", (k + 1));
-                    int j = 0;
-                    while(comandos[k][j] != NULL){
-                        printf("%s ", comandos[k][j]);
-                        j++;
-                    }
-                }
+                // printf("\ncomandos agrupados:\n");
+                // for(int k = 0;k < i;k++){
+                //     printf("comando %d:\n", (k + 1));
+                //     int j = 0;
+                //     while(comandos[k][j] != NULL){
+                //         printf("%s ", comandos[k][j]);
+                //         j++;
+                //     }
+                // }
+                ExecutaComandosExternos(comandos, i);
             }
         }
     }
@@ -77,7 +75,14 @@ void ExecutaComandosExternos(char*** comandos, int nComandos){
         int maiorComando = -1;
         while (comandos[i][j] != NULL){
             j++;
+            if(strlen(comandos[i][j]) > maiorComando) maiorComando = strlen(comandos[i][j]);
         }
+        char comando[j][maiorComando];
+        for(int k = 0;k < j;k++){
+            //strcpy(comando[k], comandos[i][k]);
+            //printf("%s ", comando[k]);
+        }
+
         
         
     }
