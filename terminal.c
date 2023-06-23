@@ -14,6 +14,38 @@ char* acsh_read_line() {
     return entrada;
 }
 
+void acsh_exec(char ** args) {
+    pid_t child_pid = fork();
+
+    // Execução em foreground
+    if (child_pid == 0) {
+        execvp(args[0], args);
+        perror("acsh");
+        exit(1);
+    } else if (child_pid > 0) {
+        int status;
+        do {
+            waitpid(child_pid, &status, WUNTRACED);
+        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+    } else {
+        perror("acsh");
+    }
+}
+
+void acsh_exit(char **args) {
+    exit(0);
+}
+
+void acsh_cd(char **args) {
+    if (args[1] == NULL) {
+        printf("acsh: cd: missing argument\n");
+    } else {
+        if (chdir(args[1]) != 0) {
+            perror("acsh: cd");
+        }
+    }
+}
+
 void RodaTerminal()
 {
     while (1)
@@ -35,19 +67,13 @@ void RodaTerminal()
         else if ((token = strtok(entrada, " ")) != NULL)
         {
             int i = 0;
-            char ***comandos = (char ***)malloc(5 * sizeof(char **));
+            char ***comandos = (char ***)malloc(MAX_PROGRAMAS_LINHA * sizeof(char **));
             while (i < MAX_PROGRAMAS_LINHA)
             {
-                int tam = 10;
-                comandos[i] = (char **)malloc(tam * sizeof(char *));
+                comandos[i] = (char **)malloc((MAX_ARGUMENTOS_PROGRAMA + 2) * sizeof(char *));
                 int j = 0;
                 while (token != NULL && strcmp(token, "<3") != 0)
                 {
-                    if (j >= tam)
-                    {
-                        tam *= 2;
-                        comandos[i] = (char **)realloc(comandos[i], tam * sizeof(char *));
-                    }
                     comandos[i][j] = (char *)malloc(20 * sizeof(char));
                     comandos[i][j] = strcpy(comandos[i][j], token);
                     // penso que as duas linhas acima poderiam ser substituídas por:
@@ -67,52 +93,71 @@ void RodaTerminal()
             if (i > MAX_PROGRAMAS_LINHA)
                 printf("\nnumero invalido de comandos\n");
 
-            else if (i == 1)
-            {
-                printf("\ncomando sozinho:\n");
-                int j = 0;
-                while (comandos[0][j] != NULL)
-                {
-                    printf("%s ", comandos[0][j]);
-                    j++;
-                }
-                printf("\n");
-            }
 
-            else
-            {
-                // printf("\ncomandos agrupados:\n");
-                // for(int k = 0;k < i;k++){
-                //     printf("comando %d:\n", (k + 1));
-                //     int j = 0;
-                //     while(comandos[k][j] != NULL){
-                //         printf("%s ", comandos[k][j]);
-                //         j++;
-                //     }
-                // }
+            else{
                 ExecutaComandosExternos(comandos, i);
             }
         }
     }
 }
 
-void ExecutaComandosExternos(char ***comandos, int nComandos)
-{
-    for (int i = 0; i < nComandos; i++)
-    {
-        int j = 0;
-        int maiorComando = -1;
-        while (comandos[i][j] != NULL)
-        {
-            j++;
-            if (strlen(comandos[i][j]) > maiorComando)
-                maiorComando = strlen(comandos[i][j]);
+void ExecutaComandosExternos(char ***comandos, int nComandos){
+    int foreground = 0;   
+    if(nComandos == 1){
+        for(int i = 0;i < 5;i++){
+            if(comandos[0][i] == NULL) break;
+            if(comandos[0][i] == "%%"){
+                 pid_t pid = fork();
+                 foreground = 1;
+                 if(pid < 0){
+                    printf("erro ao tentar criar filho.");
+                 }
+                 if(pid == 0){
+                    execvp(comandos[0][0], comandos[0]);
+                    printf("erro ao executar programa");
+                    exit(0);
+
+                    /*  char *cmd = "ls";
+                        char *argv[3];
+                        argv[0] = "ls";
+                        argv[1] = "-la";
+                        argv[2] = NULL;
+                        execvp(cmd, argv); //This will run "ls -la" as if it were a command*/
+                 }
+                 if(pid > 0 ){
+                    int status;
+                    if(waitpid(pid, &status, 0) == -1){
+                        printf("erro ao aguardar por termino do filho");
+                    }
+                 }
+            }
         }
-        char comando[j][maiorComando];
-        for (int k = 0; k < j; k++)
-        {
-            // strcpy(comando[k], comandos[i][k]);
-            // printf("%s ", comando[k]);
-        }
+    }
+    if(foreground == 0){
+            pid_t pid = fork();
+            if(pid < 0){
+                printf("erro ao tentar criar filho.");
+            }
+            if(pid == 0){
+                if(setsid() == -1){
+                    printf("erro ao tentar colocar filho em bg");
+                }
+                for(int i = 1;i < nComandos;i++){
+                    pid = fork();
+                    if(pid < 0){
+                        printf("erro ao tentar criar filho.");
+                    }
+                    if(pid == 0){
+                        execvp(comandos[i][0], comandos[i]);
+                        printf("erro ao executar programa");
+                        exit(0);
+                    }
+                }
+                printf("%s", comandos[0][0]);
+                execvp(comandos[0][0], comandos[0]);
+                printf("erro ao executar programa");
+                exit(0);
+            }
+
     }
 }
