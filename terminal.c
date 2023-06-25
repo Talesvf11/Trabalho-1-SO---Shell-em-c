@@ -24,6 +24,7 @@ char ***acsh_comandos_from_line(char *entrada)
     // Pega cada comando (aka programa)
     while (i < MAX_PROGRAMAS_LINHA)
     {
+        // WARNING: Isso está considerando que % é um argumento do programa?
         comandos[i] = (char **)malloc((MAX_ARGUMENTOS_PROGRAMA +
                                        1 /* Próprio programa */ +
                                        1 /* NULL no final */) * sizeof(char *));
@@ -138,7 +139,7 @@ void RodaTerminal()
         if (!strcmp(entrada, "exit\n"))
         {
             // TODO: finalizar todos os processos de background que ainda estejam rodando.
-            printf("\nsaindo\n");
+            printf("saindo\n");
             break;
         }
         else if (!strcmp(comandos[0][0], "cd"))
@@ -158,48 +159,42 @@ void RodaTerminal()
     }
 }
 
+void ExecutaEmForeground (char *** comandos) {
+    pid_t pid = fork();
+    if (pid < 0)
+    {
+        printf("erro ao tentar criar filho.");
+    }
+    else if (pid == 0)
+    {
+        execvp(comandos[0][0], comandos[0]);
+        printf("erro ao executar programa");
+        exit(0);
+    }
+    else if (pid > 0)
+    {
+        if (waitpid(pid, NULL, 0) == -1)
+            printf("erro ao aguardar por termino do filho");
+    }
+}
+
 void ExecutaComandosExternos(char ***comandos, int nComandos)
 {
     int foreground = 0;
+    
+    // Checa se o último parâmetro é % (pra então executar em foreground)
     if (nComandos == 1)
     {
-        // Checa se o último parâmetro é % (para então executar em foreground)
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 5; i++) // Bruno: Porque 5 vezes, especificamente?
         {
             if (comandos[0][i] == NULL)
                 break;
 
             if (!strcmp(comandos[0][i],"%"))
             {
-                pid_t pid = fork();
                 foreground = 1;
-                if (pid < 0)
-                {
-                    printf("erro ao tentar criar filho.");
-                }
-                else if (pid == 0)
-                {
-                    comandos[0][i] = NULL; // Tira o % dos argumentos
-
-                    execvp(comandos[0][0], comandos[0]);
-                    printf("erro ao executar programa");
-                    exit(0);
-
-                    /*  char *cmd = "ls";
-                        char *argv[3];
-                        argv[0] = "ls";
-                        argv[1] = "-la";
-                        argv[2] = NULL;
-                        execvp(cmd, argv); //This will run "ls -la" as if it were a command*/
-                }
-                else if (pid > 0)
-                {
-                    int status;
-                    if (waitpid(pid, &status, 0) == -1)
-                    {
-                        printf("erro ao aguardar por termino do filho");
-                    }
-                }
+                comandos[0][i] = NULL; // Tira o % dos argumentos
+                ExecutaEmForeground(comandos);
             }
         }
     }
@@ -212,6 +207,7 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
         }
         else if (pid == 0)
         {
+            // Cria uma nova sessão com apenas o filho
             if (setsid() == -1)
             {
                 printf("erro ao tentar colocar filho em bg");
