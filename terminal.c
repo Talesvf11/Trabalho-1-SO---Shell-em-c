@@ -19,14 +19,14 @@ char ***acsh_comandos_from_line(char *entrada)
 {
     int i = 0;
     char ***comandos = (char ***)malloc(MAX_PROGRAMAS_LINHA * sizeof(char **));
-    char *token = strtok(entrada, " ");
+    char *token = strtok(entrada, " \n");
     // printf("first token: %s\n", token);
     // Pega cada comando (aka programa)
     while (i < MAX_PROGRAMAS_LINHA)
     {
-        // WARNING: Isso está considerando que % é um argumento do programa?
         comandos[i] = (char **)malloc((MAX_ARGUMENTOS_PROGRAMA +
                                        1 /* Próprio programa */ +
+                                       1 /* Possível % */ +
                                        1 /* NULL no final */) * sizeof(char *));
         int j = 0;
 
@@ -36,8 +36,8 @@ char ***acsh_comandos_from_line(char *entrada)
             comandos[i][j] = token;
             // printf("debug: [%d][%d] %s\n", i, j, comandos[i][j]);
             j++;
-            if (j >= MAX_ARGUMENTOS_PROGRAMA + 2) {
-                printf("\nnumero invalido de argumentos\n");
+            if (j >= MAX_ARGUMENTOS_PROGRAMA + 2 && strcmp(token, "%")) {
+                printf("numero invalido de argumentos\n");
             }
             token = strtok(NULL, " \n");
             // printf("new token read: %s\n", token);
@@ -136,7 +136,7 @@ void RodaTerminal()
         char * entrada = acsh_read_line();
         char * entrada_original_ptr = entrada;
         char ***comandos = acsh_comandos_from_line(entrada);
-        if (!strcmp(entrada, "exit\n"))
+        if (!strcmp(entrada, "exit"))
         {
             // TODO: finalizar todos os processos de background que ainda estejam rodando.
             printf("saindo\n");
@@ -198,6 +198,7 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
             }
         }
     }
+    // WARNING: Comandos que escrevem no terminal, quando em foreground, frequentemente dessincronizam a impressão de "acsh>"
     if (foreground == 0)
     {
         pid_t pid = fork();
@@ -212,6 +213,7 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
             {
                 printf("erro ao tentar colocar filho em bg");
             }
+            // WARNING: Desse jeito, o primeiro processo vai acabar sendo o último a executar.
             for (int i = 1; i < nComandos; i++)
             {
                 pid = fork();
@@ -219,7 +221,7 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
                 {
                     printf("erro ao tentar criar filho.");
                 }
-                if (pid == 0)
+                else if (pid == 0)
                 {
                     execvp(comandos[i][0], comandos[i]);
                     printf("erro ao executar programa");
