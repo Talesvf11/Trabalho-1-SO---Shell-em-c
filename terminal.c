@@ -135,7 +135,7 @@ void RodaTerminal()
         char * entrada = acsh_read_line();
         char * entrada_original_ptr = entrada;
         char ***comandos = acsh_comandos_from_line(entrada);
-        if (!strcmp(entrada, "exit"))
+        if (!strcmp(entrada, "exit\n"))
         {
             // TODO: finalizar todos os processos de background que ainda estejam rodando.
             printf("\nsaindo\n");
@@ -168,8 +168,8 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
         {
             if (comandos[0][i] == NULL)
                 break;
-                
-            if (comandos[0][i] == "%%")
+
+            if (!strcmp(comandos[0][i],"%"))
             {
                 pid_t pid = fork();
                 foreground = 1;
