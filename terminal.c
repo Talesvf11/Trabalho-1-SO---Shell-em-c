@@ -21,12 +21,15 @@ char ***acsh_comandos_from_line(char *entrada)
     char ***comandos = (char ***)malloc(MAX_PROGRAMAS_LINHA * sizeof(char **));
     char *token = strtok(entrada, " ");
     // printf("first token: %s\n", token);
+    // Pega cada comando (aka programa)
     while (i < MAX_PROGRAMAS_LINHA)
     {
         comandos[i] = (char **)malloc((MAX_ARGUMENTOS_PROGRAMA +
                                        1 /* Próprio programa */ +
                                        1 /* NULL no final */) * sizeof(char *));
         int j = 0;
+
+        // Pega os argumentos do programa
         while (token != NULL && strcmp(token, "<3") != 0)
         {
             comandos[i][j] = token;
@@ -35,9 +38,10 @@ char ***acsh_comandos_from_line(char *entrada)
             if (j >= MAX_ARGUMENTOS_PROGRAMA + 2) {
                 printf("\nnumero invalido de argumentos\n");
             }
-            token = strtok(NULL, " ");
+            token = strtok(NULL, " \n");
             // printf("new token read: %s\n", token);
         }
+        
         comandos[i][j] = NULL; // Sinaliza o fim da lista de argumentos do programa.
         i++;
         // printf("debug i: %d\n", i);
@@ -64,9 +68,9 @@ char ***acsh_comandos_from_line(char *entrada)
 
 int qtd_comandos(char *** comandos) {
     int i;
-    for (i = 0; i < MAX_PROGRAMAS_LINHA; i++) {
+    for (i = 0; i < MAX_PROGRAMAS_LINHA; i++)
         if (comandos[i] == NULL) return i;
-    }
+        
     return i;
 }
 
@@ -131,20 +135,23 @@ void RodaTerminal()
         char * entrada = acsh_read_line();
         char * entrada_original_ptr = entrada;
         char ***comandos = acsh_comandos_from_line(entrada);
-        if (!strcmp(entrada, "exit\n"))
+        if (!strcmp(entrada, "exit"))
         {
             // TODO: finalizar todos os processos de background que ainda estejam rodando.
             printf("\nsaindo\n");
             break;
         }
-        else if (!strcmp(entrada, "cd\n"))
+        else if (!strcmp(comandos[0][0], "cd"))
         {
             printf("\nmudando diretorio\n");
+            chdir(comandos[0][1]); // Só é necessário isso?
         }
 
-        printf("qtd comandos: %d\n", qtd_comandos(comandos));
+        //printf("qtd comandos: %d\n", qtd_comandos(comandos));
 
-        ExecutaComandosExternos(comandos, qtd_comandos(comandos));
+        else {
+            ExecutaComandosExternos(comandos, qtd_comandos(comandos));
+        }
 
         free(entrada);
         libera_comandos(comandos);
@@ -156,10 +163,12 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
     int foreground = 0;
     if (nComandos == 1)
     {
+        // Checa se o último parâmetro é % (para então executar em foreground)
         for (int i = 0; i < 5; i++)
         {
             if (comandos[0][i] == NULL)
                 break;
+                
             if (comandos[0][i] == "%%")
             {
                 pid_t pid = fork();
@@ -168,8 +177,10 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
                 {
                     printf("erro ao tentar criar filho.");
                 }
-                if (pid == 0)
+                else if (pid == 0)
                 {
+                    comandos[0][i] = NULL; // Tira o % dos argumentos
+
                     execvp(comandos[0][0], comandos[0]);
                     printf("erro ao executar programa");
                     exit(0);
@@ -181,7 +192,7 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
                         argv[2] = NULL;
                         execvp(cmd, argv); //This will run "ls -la" as if it were a command*/
                 }
-                if (pid > 0)
+                else if (pid > 0)
                 {
                     int status;
                     if (waitpid(pid, &status, 0) == -1)
@@ -199,7 +210,7 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
         {
             printf("erro ao tentar criar filho.");
         }
-        if (pid == 0)
+        else if (pid == 0)
         {
             if (setsid() == -1)
             {
