@@ -7,7 +7,11 @@ char *acsh_read_line()
 {
     char *entrada = NULL;
     size_t size = 0;
-    getline(&entrada, &size, stdin);
+    
+    if(getline(&entrada, &size, stdin) == -1){
+        int i = errno;
+        printf("erro: %s\n", strerror(i));
+    }
     // TODO: tratar falha de leitura, liberando memória.
     /* "If *lineptr is set to NULL and *n is set 0 before the call, then getline() will al‐
        locate a buffer for storing the line.  This buffer should be freed by the user pro‐
@@ -18,10 +22,12 @@ char *acsh_read_line()
 char ***acsh_comandos_from_line(char *entrada)
 {
     int i = 0;
-    char ***comandos = (char ***)malloc(MAX_PROGRAMAS_LINHA * sizeof(char **));
     char *token = strtok(entrada, " \n");
+    if(token == NULL) return NULL;
+
     // printf("first token: %s\n", token);
     // Pega cada comando (aka programa)
+    char ***comandos = (char ***)malloc(MAX_PROGRAMAS_LINHA * sizeof(char **));
     while (i < MAX_PROGRAMAS_LINHA)
     {
         comandos[i] = (char **)malloc((MAX_ARGUMENTOS_PROGRAMA +
@@ -128,34 +134,55 @@ void acsh_cd(char **args)
     }
 }
 
+void main_sig_handler(int sig){
+    printf("Não adianta me enviar o sinal por Ctrl-... . Estou vacinado!!\n");
+}
+
 void RodaTerminal()
 {
+    struct sigaction sa;
+    sa.sa_handler = main_sig_handler;
+    sigemptyset(&sa.sa_mask);
+    sigaddset(&sa.sa_mask, SIGINT);
+    sigaddset(&sa.sa_mask, SIGQUIT);
+    sigaddset(&sa.sa_mask, SIGTSTP);
+    sa.sa_flags = SA_RESTART;
+
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGQUIT, &sa, NULL);
+    sigaction(SIGTSTP, &sa, NULL);
+
+    //signal(SIGTSTP, main_sig_handler);
+
+    char ***comandos;
     while (1)
     {
         printf("acsh> ");
         char * entrada = acsh_read_line();
         char * entrada_original_ptr = entrada;
-        char ***comandos = acsh_comandos_from_line(entrada);
-        if (!strcmp(entrada, "exit"))
-        {
-            // TODO: finalizar todos os processos de background que ainda estejam rodando.
-            printf("saindo\n");
-            break;
-        }
-        else if (!strcmp(comandos[0][0], "cd"))
-        {
-            printf("\nmudando diretorio\n");
-            chdir(comandos[0][1]); // Só é necessário isso?
-        }
+        comandos = acsh_comandos_from_line(entrada);
+        if(comandos != NULL){
+            if (!strcmp(entrada, "exit"))
+            {
+                // TODO: finalizar todos os processos de background que ainda estejam rodando.
+                printf("saindo\n");
+                exit(0);
+            }
+            else if (!strcmp(comandos[0][0], "cd"))
+            {
+                printf("\nmudando diretorio\n");
+                chdir(comandos[0][1]); // Só é necessário isso?
+            }
 
-        //printf("qtd comandos: %d\n", qtd_comandos(comandos));
+            //printf("qtd comandos: %d\n", qtd_comandos(comandos));
 
-        else {
-            ExecutaComandosExternos(comandos, qtd_comandos(comandos));
+            else {
+                ExecutaComandosExternos(comandos, qtd_comandos(comandos));
+            }
+
+            free(entrada);
+            libera_comandos(comandos);
         }
-
-        free(entrada);
-        libera_comandos(comandos);
     }
 }
 
@@ -168,20 +195,37 @@ void ExecutaEmForeground (char *** comandos) {
     else if (pid == 0)
     {
         execvp(comandos[0][0], comandos[0]);
-        printf("erro ao executar programa");
+        printf("erro ao executar programa\n");
         exit(0);
     }
     else if (pid > 0)
     {
+        struct sigaction sa, old;
+        sa.sa_handler = SIG_IGN;
+        sigemptyset(&sa.sa_mask);
+        sigaddset(&sa.sa_mask, SIGINT);
+        sigaddset(&sa.sa_mask, SIGQUIT);
+        sigaddset(&sa.sa_mask, SIGTSTP);
+        sa.sa_flags = SA_RESTART;
+
+        sigaction(SIGINT, &sa, &old);
+        sigaction(SIGQUIT, &sa, &old);
+        sigaction(SIGTSTP, &sa, &old);
+
         if (waitpid(pid, NULL, 0) == -1)
             printf("erro ao aguardar por termino do filho");
+        
+        sigaction(SIGINT, &old, NULL);
+        sigaction(SIGQUIT, &old, NULL);
+        sigaction(SIGTSTP, &old, NULL);
     }
 }
+
 
 void ExecutaComandosExternos(char ***comandos, int nComandos)
 {
     int foreground = 0;
-    
+
     // Checa se o último parâmetro é % (pra então executar em foreground)
     if (nComandos == 1)
     {
@@ -228,7 +272,7 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
                     exit(0);
                 }
             }
-            printf("%s", comandos[0][0]);
+            //printf("%s", comandos[0][0]);
             execvp(comandos[0][0], comandos[0]);
             printf("erro ao executar programa");
             exit(0);
