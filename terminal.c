@@ -1,4 +1,5 @@
 #include "terminal.h"
+#include <termios.h>
 
 #define MAX_PROGRAMAS_LINHA 5
 #define MAX_ARGUMENTOS_PROGRAMA 3
@@ -164,6 +165,7 @@ void RodaTerminal()
         if(comandos != NULL){
             if (!strcmp(entrada, "exit"))
             {
+                int status;
                 // TODO: finalizar todos os processos de background que ainda estejam rodando.
                 printf("saindo\n");
                 exit(0);
@@ -242,7 +244,7 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
             }
         }
     }
-    // WARNING: Comandos que escrevem no terminal, quando em foreground, frequentemente dessincronizam a impressão de "acsh>"
+    // WARNING: Comandos que escrevem no terminal, quando em background, frequentemente dessincronizam a impressão de "acsh>"
     if (foreground == 0)
     {
         pid_t pid = fork();
@@ -252,6 +254,20 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
         }
         else if (pid == 0)
         {
+            int f1 = open("/dev/null", O_RDONLY);
+            int f2 = open("/dev/null", O_WRONLY);
+            int f3 = open("/dev/null", O_WRONLY);
+            
+            if(dup2(f1, 0) == -1){
+                printf("erro");
+            }
+            if(dup2(f2, 1) == -1){
+                printf("erro");
+            }
+            if(dup2(f3, 2) == -1){
+                printf("erro");
+            }
+
             // Cria uma nova sessão com apenas o filho
             if (setsid() == -1)
             {
@@ -272,7 +288,7 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
                     exit(0);
                 }
             }
-            //printf("%s", comandos[0][0]);
+            
             execvp(comandos[0][0], comandos[0]);
             printf("erro ao executar programa");
             exit(0);

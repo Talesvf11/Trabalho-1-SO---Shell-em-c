@@ -1,3 +1,9 @@
 programa
 terminal.o
 main.o
+*.out
+*.exe
+a
+teste
+teste.c
+.vscode
