@@ -158,6 +158,13 @@ void RodaTerminal()
     char ***comandos;
     while (1)
     {
+        int wstatus;
+        // Toda vez que passar aqui, vai verificar se algum processo Session Leader,
+        // daqueles que a gente cria o processo do primeiro comando como, e que é pai
+        // dos processos dos outros comandos. Isso fornece uma limpeza de tempos em tempos,
+        // o que previne a acumulação de processos Zumbis.
+        waitpid(-1, &wstatus, WNOHANG);
+
         printf("acsh> ");
         char * entrada = acsh_read_line();
         char * entrada_original_ptr = entrada;
@@ -175,8 +182,6 @@ void RodaTerminal()
                 printf("\nmudando diretorio\n");
                 chdir(comandos[0][1]); // Só é necessário isso?
             }
-
-            //printf("qtd comandos: %d\n", qtd_comandos(comandos));
 
             else {
                 ExecutaComandosExternos(comandos, qtd_comandos(comandos));
@@ -223,7 +228,6 @@ void ExecutaEmForeground (char *** comandos) {
     }
 }
 
-
 void ExecutaComandosExternos(char ***comandos, int nComandos)
 {
     int foreground = 0;
@@ -244,7 +248,6 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
             }
         }
     }
-    // WARNING: Comandos que escrevem no terminal, quando em background, frequentemente dessincronizam a impressão de "acsh>"
     if (foreground == 0)
     {
         pid_t pid = fork();
@@ -281,6 +284,10 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
                 {
                     printf("erro ao tentar criar filho.");
                 }
+                else if (pid > 0) 
+                {
+                    wait(NULL);
+                }
                 else if (pid == 0)
                 {
                     execvp(comandos[i][0], comandos[i]);
@@ -288,7 +295,7 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
                     exit(0);
                 }
             }
-            
+
             execvp(comandos[0][0], comandos[0]);
             printf("erro ao executar programa");
             exit(0);
