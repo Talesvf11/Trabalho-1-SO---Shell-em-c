@@ -137,6 +137,8 @@ void acsh_cd(char **args)
 
 void main_sig_handler(int sig){
     printf("Não adianta me enviar o sinal por Ctrl-... . Estou vacinado!!\n");
+    printf("acsh> ");
+    fflush(stdout); // Para garantir que acsh> é imediatamente impresso
 }
 
 void RodaTerminal()

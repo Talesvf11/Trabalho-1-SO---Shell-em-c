@@ -4,7 +4,6 @@ CFLAGS =
 
 # Alvo padrão
 all: programa
-	@./programa
 
 # Regra para compilar o programa
 programa: main.o terminal.o
