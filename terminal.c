@@ -9,14 +9,9 @@ char *acsh_read_line()
     char *entrada = NULL;
     size_t size = 0;
     
-    if(getline(&entrada, &size, stdin) == -1){
-        int i = errno;
-        printf("erro: %s\n", strerror(i));
-    }
-    // TODO: tratar falha de leitura, liberando memória.
-    /* "If *lineptr is set to NULL and *n is set 0 before the call, then getline() will al‐
-       locate a buffer for storing the line.  This buffer should be freed by the user pro‐
-       gram even if getline() failed." */
+    if(getline(&entrada, &size, stdin) == -1)
+        free(entrada);
+    
     return entrada;
 }
 
@@ -26,7 +21,6 @@ char ***acsh_comandos_from_line(char *entrada)
     char *token = strtok(entrada, " \n");
     if(token == NULL) return NULL;
 
-    // printf("first token: %s\n", token);
     // Pega cada comando (aka programa)
     char ***comandos = (char ***)malloc(MAX_PROGRAMAS_LINHA * sizeof(char **));
     while (i < MAX_PROGRAMAS_LINHA)
@@ -41,18 +35,18 @@ char ***acsh_comandos_from_line(char *entrada)
         while (token != NULL && strcmp(token, "<3") != 0)
         {
             comandos[i][j] = token;
-            // printf("debug: [%d][%d] %s\n", i, j, comandos[i][j]);
+            
             j++;
             if (j >= MAX_ARGUMENTOS_PROGRAMA + 2 && strcmp(token, "%")) {
                 printf("numero invalido de argumentos\n");
             }
             token = strtok(NULL, " \n");
-            // printf("new token read: %s\n", token);
+            
         }
         
         comandos[i][j] = NULL; // Sinaliza o fim da lista de argumentos do programa.
         i++;
-        // printf("debug i: %d\n", i);
+        
         if (token == NULL) { // Não tem mais programas para serem executados.
             // Preenche o restante dos "ponteiros para programas" com NULL.
             // Assim, é possível consultar depois quantos programas temos.
@@ -63,10 +57,9 @@ char ***acsh_comandos_from_line(char *entrada)
         }
         else {
             token = strtok(NULL, " \n");
-            // printf("new token read: %s\n", token);
         }
     }
-    // printf("debug i: %d\n", i);
+    
     if (i >= MAX_PROGRAMAS_LINHA) {
         printf("\nnumero invalido de comandos\n");
     }
@@ -84,7 +77,7 @@ int qtd_comandos(char *** comandos) {
 
 void libera_comandos(char *** comandos) {
     for (int i = 0; i < 1; i++) { 
-        // printf("debug liberando comandos: %d\n", i);
+        
         free(comandos[i]);
     }
     free(comandos);
@@ -142,7 +135,8 @@ void RodaTerminal()
             }
             else if (!strcmp(comandos[0][0], "cd"))
             {
-                printf("\ndiretório mudado\n");
+                printf("%s\n", comandos[0][1]);
+                fflush(stdout);
                 chdir(comandos[0][1]); // Só é necessário isso?
             }
 
