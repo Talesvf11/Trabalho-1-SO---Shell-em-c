@@ -62,7 +62,7 @@ char ***acsh_comandos_from_line(char *entrada)
             break;
         }
         else {
-            token = strtok(NULL, " ");
+            token = strtok(NULL, " \n");
             // printf("new token read: %s\n", token);
         }
     }
@@ -90,51 +90,6 @@ void libera_comandos(char *** comandos) {
     free(comandos);
 }
 
-void acsh_exec(char **args)
-{
-    pid_t child_pid = fork();
-
-    // Execução em foreground
-    if (child_pid == 0)
-    {
-        execvp(args[0], args);
-        perror("acsh");
-        exit(1);
-    }
-    else if (child_pid > 0)
-    {
-        int status;
-        do
-        {
-            waitpid(child_pid, &status, WUNTRACED);
-        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-    }
-    else
-    {
-        perror("acsh");
-    }
-}
-
-void acsh_exit(char **args)
-{
-    exit(0);
-}
-
-void acsh_cd(char **args)
-{
-    if (args[1] == NULL)
-    {
-        printf("acsh: cd: missing argument\n");
-    }
-    else
-    {
-        if (chdir(args[1]) != 0)
-        {
-            perror("acsh: cd");
-        }
-    }
-}
-
 void main_sig_handler(int sig){
     printf("Não adianta me enviar o sinal por Ctrl-... . Estou vacinado!!\n");
     printf("acsh> ");
@@ -143,6 +98,7 @@ void main_sig_handler(int sig){
 
 void RodaTerminal()
 {
+    // Coloca o handler de SIGINT, SIGQUIT e SIGSTP
     struct sigaction sa;
     sa.sa_handler = main_sig_handler;
     sigemptyset(&sa.sa_mask);
@@ -155,7 +111,8 @@ void RodaTerminal()
     sigaction(SIGQUIT, &sa, NULL);
     sigaction(SIGTSTP, &sa, NULL);
 
-    //signal(SIGTSTP, main_sig_handler);
+    int proximo_supervisor = 0;
+    int supervisores[10000];
 
     char ***comandos;
     while (1)
@@ -175,18 +132,22 @@ void RodaTerminal()
             if (!strcmp(entrada, "exit"))
             {
                 int status;
-                // TODO: finalizar todos os processos de background que ainda estejam rodando.
-                printf("saindo\n");
+                char mata_processos[50];
+                // Pega cada supervisor de sessão, e usa o comando pkill -P para matar ele e os filhos criados por ele (processos que o usuário realmente pediu)
+                for (int i = 0; i < proximo_supervisor; i++) {
+                    snprintf(mata_processos, sizeof(mata_processos), "pkill -P %d", supervisores[i]);
+                    system(mata_processos);
+                }
                 exit(0);
             }
             else if (!strcmp(comandos[0][0], "cd"))
             {
-                printf("\nmudando diretorio\n");
+                printf("\ndiretório mudado\n");
                 chdir(comandos[0][1]); // Só é necessário isso?
             }
 
             else {
-                ExecutaComandosExternos(comandos, qtd_comandos(comandos));
+                ExecutaComandosExternos(comandos, qtd_comandos(comandos), supervisores, &proximo_supervisor);
             }
 
             free(entrada);
@@ -230,14 +191,13 @@ void ExecutaEmForeground (char *** comandos) {
     }
 }
 
-void ExecutaComandosExternos(char ***comandos, int nComandos)
+void ExecutaComandosExternos(char ***comandos, int nComandos, int * supervisores, int * proximo_supervisor)
 {
     int foreground = 0;
-
     // Checa se o último parâmetro é % (pra então executar em foreground)
     if (nComandos == 1)
     {
-        for (int i = 0; i < 5; i++) // Bruno: Porque 5 vezes, especificamente?
+        for (int i = 0; i < 5; i++)
         {
             if (comandos[0][i] == NULL)
                 break;
@@ -273,22 +233,31 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
                 printf("erro");
             }
 
-            // Cria uma nova sessão com apenas o filho
+            //Coloca o handler de SIGUSR1
+
+            if(nComandos == 1){
+                struct sigaction sa;
+                sa.sa_handler = SIG_IGN;
+                sigemptyset(&sa.sa_mask);
+                sigaddset(&sa.sa_mask, SIGUSR1);
+                sa.sa_flags = SA_RESTART;
+
+                sigaction(SIGUSR1, &sa, NULL);
+            }
+
+            // Cria uma nova sessão com apenas o supervisor
             if (setsid() == -1)
             {
                 printf("erro ao tentar colocar filho em bg");
             }
-            // WARNING: Desse jeito, o primeiro processo vai acabar sendo o último a executar.
-            for (int i = 1; i < nComandos; i++)
+            
+            int i;
+            for (i = 0; i < nComandos; i++)
             {
                 pid = fork();
                 if (pid < 0)
                 {
                     printf("erro ao tentar criar filho.");
-                }
-                else if (pid > 0) 
-                {
-                    wait(NULL);
                 }
                 else if (pid == 0)
                 {
@@ -298,9 +267,20 @@ void ExecutaComandosExternos(char ***comandos, int nComandos)
                 }
             }
 
-            execvp(comandos[0][0], comandos[0]);
-            printf("erro ao executar programa");
+            int status = 0;
+            while (waitpid(0, &status, WUNTRACED) >= 0) {
+                if ((WIFSIGNALED(status)) && (WTERMSIG(status) == SIGUSR1)) {
+                    killpg(0, SIGTERM);
+                }
+            }
             exit(0);
+            printf("[Cheguei onde não deveria]");
+            fflush(stdout);
+        }
+        else if (pid > 0) 
+        {
+            supervisores[*proximo_supervisor] = pid;
+            (*proximo_supervisor)++;
         }
     }
 }

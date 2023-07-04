@@ -13,7 +13,7 @@
 
 void RodaTerminal();
 
-void ExecutaComandosExternos(char*** comandos, int nComandos);
+void ExecutaComandosExternos(char*** comandos, int nComandos, int * supervisores, int * proximo_supervisor);
 
 
 

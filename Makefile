@@ -1,3 +1,8 @@
+#Integrantes:
+#Bruno Lopes Altoé
+#Vitor Facco Calmon
+#Tales Viana Ferracioli
+
 # Compilador e flags do compilador
 CC = gcc
 CFLAGS = 
@@ -27,6 +32,6 @@ cleanob:
 
 # Regra para mostrar os processos
 ps:
-	ps  xao pid,ppid,pgid,sid,comm,stat %
+	ps  xao pid,ppid,pgid,sid,comm,stat
 
 # Digitar @comando não mostra o comando no terminal.
