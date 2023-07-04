@@ -137,7 +137,7 @@ void RodaTerminal()
             {
                 printf("%s\n", comandos[0][1]);
                 fflush(stdout);
-                chdir(comandos[0][1]); // Só é necessário isso?
+                chdir(comandos[0][1]);
             }
 
             else {
